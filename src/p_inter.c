@@ -466,7 +466,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				toucher->momz /= -8;
 				special->flags &= ~MF_SPECIAL;
 				if (special->info->activesound)
-					S_StartSound(special, special->info->activesound);
+					S_StartSoundFromMobj(special, special->info->activesound);
 				P_SetTarget(&special->tracer, toucher);
 				player->homing = 0;
 				return;
@@ -703,7 +703,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 			if (!(gametyperules & GTR_SPECIALSTAGES) || modeattacking) // score only?
 			{
-				S_StartSound(toucher, sfx_chchng);
+				S_StartSoundFromMobj(toucher, sfx_chchng);
 				break;
 			}
 
@@ -716,20 +716,20 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					player->continues += 1;
 					player->gotcontinue = true;
 					if (P_IsLocalPlayer(player))
-						S_StartSound(NULL, sfx_s3kac);
+						S_StartSoundFromEverywhere(sfx_s3kac);
 					else
-						S_StartSound(toucher, sfx_chchng);
+						S_StartSoundFromMobj(toucher, sfx_chchng);
 				}
 				else
 				{
 					P_GiveCoopLives(player, 1, true); // if continues are disabled, a life is a reasonable substitute
-					S_StartSound(toucher, sfx_chchng);
+					S_StartSoundFromMobj(toucher, sfx_chchng);
 				}
 			}
 			else
 			{
 				token++;
-				S_StartSound(toucher, sfx_token);
+				S_StartSoundFromMobj(toucher, sfx_token);
 			}
 
 			break;
@@ -752,10 +752,9 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				{
 					if (!playeringame[i] || players[i].spectator)
 						continue;
-
-					players[i].exiting = (14*TICRATE)/5 + 1;
+					P_DoPlayerExit(&players[i], true);
 				}
-				//S_StartSound(NULL, sfx_lvpass);
+				//S_StartSoundFromEverywhere(sfx_lvpass);
 			}
 			break;
 
@@ -849,7 +848,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					if (prevCollected == false && P_EmblemWasCollected(special->health - 1) == true)
 					{
 						// Play the sound if it was collected.
-						S_StartSound((shareEmblems ? NULL : special), special->info->deathsound);
+						S_StartSoundFromMobj((shareEmblems ? NULL : special), special->info->deathsound);
 					}
 					else
 					{
@@ -922,7 +921,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 							// The fuse code plays this sound effect
 							//if (players[consoleplayer].ctfteam == player->ctfteam)
-							//	S_StartSound(NULL, sfx_hoop1);
+							//	S_StartSoundFromEverywhere(sfx_hoop1);
 						}
 					}
 				}
@@ -975,14 +974,14 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 						// Don't play Ideya sound in special stage mode
 					}
 					else
-						S_StartSound(toucher, special->info->activesound);
+						S_StartSoundFromMobj(toucher, special->info->activesound);
 				}
 				else //Initial transformation. Don't allow second chances in special stages!
 				{
 					if (player->powers[pw_carry] == CR_NIGHTSMODE)
 						return;
 
-					S_StartSound(toucher, sfx_supert);
+					S_StartSoundFromMobj(toucher, sfx_supert);
 				}
 				P_SwitchSpheresBonusMode(false);
 				if (!(netgame || multiplayer) && !(player->powers[pw_carry] == CR_NIGHTSMODE))
@@ -1069,7 +1068,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				else if (player->mo->tracer && player->mare)
 				{
 					P_KillMobj(toucher->tracer, NULL, NULL, 0); // No emerald for you just yet!
-					S_StartSound(NULL, sfx_ghosty);
+					S_StartSoundFromEverywhere(sfx_ghosty);
 					special->flags2 |= MF2_DONTDRAW;
 				}
 
@@ -1126,7 +1125,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				x = (x/count)<<FRACBITS;
 				y = (y/count)<<FRACBITS;
 				z = (z/count)<<FRACBITS;
-				gatherradius = P_AproxDistance(P_AproxDistance(special->x - x, special->y - y), special->z - z);
+				gatherradius = GetDistance3D(x, y, z, special->x, special->y, special->z);
 				P_RemoveMobj(special);
 
 				if (player->powers[pw_nights_superloop])
@@ -1141,7 +1140,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				for (d = 0; d < 16; d++)
 					P_SpawnParaloop(x, y, z, gatherradius, 16, MT_NIGHTSPARKLE, sparklestate, d*ANGLE_22h, false);
 
-				S_StartSound(toucher, sfx_prloop);
+				S_StartSoundFromMobj(toucher, sfx_prloop);
 
 				// Now we RE-scan all the thinkers to find close objects to pull
 				// in from the paraloop. Isn't this just so efficient?
@@ -1152,7 +1151,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 					mo2 = (mobj_t *)th;
 
-					if (P_AproxDistance(P_AproxDistance(mo2->x - x, mo2->y - y), mo2->z - z) > gatherradius)
+					if (GetDistance3D(x, y, z, mo2->x, mo2->y, mo2->z) > gatherradius)
 						continue;
 
 					if (mo2->flags & MF_SHOOTABLE)
@@ -1174,7 +1173,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 							mo2->flags2 &= ~MF2_DONTDRAW;
 							mo2->flags |= MF_SPECIAL;
 							mo2->flags &= ~MF_NIGHTSITEM;
-							S_StartSound(toucher, sfx_hidden);
+							S_StartSoundFromMobj(toucher, sfx_hidden);
 							continue;
 						}
 					}
@@ -1240,7 +1239,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 			if (player->bumpertime <= (TICRATE/2)-5)
 			{
-				S_StartSound(toucher, special->info->seesound);
+				S_StartSoundFromMobj(toucher, special->info->seesound);
 				if (player->powers[pw_carry] == CR_NIGHTSMODE)
 				{
 					player->bumpertime = TICRATE/2;
@@ -1298,7 +1297,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					if (playeringame[i] && players[i].powers[pw_carry] == CR_NIGHTSMODE)
 						players[i].powers[pw_nights_superloop] = (UINT16)special->info->speed;
 				if (special->info->deathsound != sfx_None)
-					S_StartSound(NULL, special->info->deathsound);
+					S_StartSoundFromEverywhere(special->info->deathsound);
 			}
 
 			// CECHO showing you what this item is
@@ -1320,7 +1319,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					if (playeringame[i] && players[i].powers[pw_carry] == CR_NIGHTSMODE)
 						players[i].drillmeter = special->info->speed;
 				if (special->info->deathsound != sfx_None)
-					S_StartSound(NULL, special->info->deathsound);
+					S_StartSoundFromEverywhere(special->info->deathsound);
 			}
 
 			// CECHO showing you what this item is
@@ -1354,7 +1353,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 							P_SetTarget(&flickyobj->target, players[i].mo);
 					}
 				if (special->info->deathsound != sfx_None)
-					S_StartSound(NULL, special->info->deathsound);
+					S_StartSoundFromEverywhere(special->info->deathsound);
 			}
 
 			// CECHO showing you what this item is
@@ -1386,7 +1385,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 						P_RestoreMusic(&players[i]);
 					}
 				if (special->info->deathsound != sfx_None)
-					S_StartSound(NULL, special->info->deathsound);
+					S_StartSoundFromEverywhere(special->info->deathsound);
 			}
 
 			// CECHO showing you what this item is
@@ -1414,7 +1413,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 						players[i].linktimer = nightslinktics;
 					}
 				if (special->info->deathsound != sfx_None)
-					S_StartSound(NULL, special->info->deathsound);
+					S_StartSoundFromEverywhere(special->info->deathsound);
 			}
 
 			// CECHO showing you what this item is
@@ -1468,11 +1467,11 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 			// Play hoop sound -- pick one depending on the current link.
 			if (player->linkcount <= 5)
-				S_StartSound(toucher, sfx_hoop1);
+				S_StartSoundFromMobj(toucher, sfx_hoop1);
 			else if (player->linkcount <= 10)
-				S_StartSound(toucher, sfx_hoop2);
+				S_StartSoundFromMobj(toucher, sfx_hoop2);
 			else
-				S_StartSound(toucher, sfx_hoop3);
+				S_StartSoundFromMobj(toucher, sfx_hoop3);
 			return;
 
 // ***** //
@@ -1487,7 +1486,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					{
 						// Stop it!
 						special->momx = special->momy = 0;
-						S_StartSound(toucher, sfx_mario2);
+						S_StartSoundFromMobj(toucher, sfx_mario2);
 						P_SetTarget(&special->target, NULL);
 						special->threshold = TICRATE - 1;
 						toucher->momz = -toucher->momz;
@@ -1500,7 +1499,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					// Kick that sucker around!
 					special->movedir = ((special->movedir == 1) ? -1 : 1);
 					P_InstaThrust(special, toucher->angle, (special->info->speed*special->scale));
-					S_StartSound(toucher, sfx_mario2);
+					S_StartSoundFromMobj(toucher, sfx_mario2);
 					P_SetTarget(&special->target, toucher);
 					special->threshold = (3*TICRATE)/2;
 					if (bounceon)
@@ -1550,7 +1549,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			if (player->bot && player->bot != BOT_MPAI)
 				return;
 
-			S_StartSound(toucher, sfx_mario3);
+			S_StartSoundFromMobj(toucher, sfx_mario3);
 
 			player->powers[pw_shield] = (player->powers[pw_shield] & SH_NOSTACK)|SH_FIREFLOWER;
 
@@ -1574,8 +1573,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				fixed_t touchx, touchy, touchspeed;
 				angle_t angle;
 
-				if (P_AproxDistance(toucher->x-special->x, toucher->y-special->y) >
-					P_AproxDistance((toucher->x-toucher->momx)-special->x, (toucher->y-toucher->momy)-special->y))
+				if (P_AreMobjsFar2D(toucher, special, GetDistance2D(toucher->x - toucher->momx, toucher->y - toucher->momy, special->x, special->y)))
 				{
 					touchx = toucher->x + toucher->momx;
 					touchy = toucher->y + toucher->momy;
@@ -1587,7 +1585,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				}
 
 				angle = R_PointToAngle2(special->x, special->y, touchx, touchy);
-				touchspeed = P_AproxDistance(toucher->momx, toucher->momy);
+				touchspeed = P_GetMobjMomentum2D(toucher);
 
 				toucher->momx = P_ReturnThrustX(special, angle, touchspeed);
 				toucher->momy = P_ReturnThrustY(special, angle, touchspeed);
@@ -1603,7 +1601,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				player->homing = 0;
 
 				// Play a bounce sound?
-				S_StartSound(toucher, special->info->painsound);
+				S_StartSoundFromMobj(toucher, special->info->painsound);
 			}
 			return;
 
@@ -1633,7 +1631,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 		case MT_EGGSHIELD:
 			{
 				angle_t angle = R_PointToAngle2(special->x, special->y, toucher->x, toucher->y) - special->angle;
-				fixed_t touchspeed = P_AproxDistance(toucher->momx, toucher->momy);
+				fixed_t touchspeed = P_GetMobjMomentum2D(toucher);
 				if (touchspeed < special->scale)
 					touchspeed = special->scale;
 
@@ -1654,7 +1652,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 					player->homing = 0;
 
 					// Play a bounce sound?
-					S_StartSound(toucher, special->info->painsound);
+					S_StartSoundFromMobj(toucher, special->info->painsound);
 
 					// experimental bounce
 					if (special->target)
@@ -1704,7 +1702,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			P_SetPlayerAngle(player, toucher->angle);
 #endif
 
-			S_StartSound(toucher, special->info->attacksound); // home run
+			S_StartSoundFromMobj(toucher, special->info->attacksound); // home run
 
 			return;
 
@@ -1714,7 +1712,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			{
 				special->momx = toucher->momx;
 				special->momy = toucher->momy;
-				special->momz = P_AproxDistance(toucher->momx, toucher->momy)/4;
+				special->momz = P_GetMobjMomentum2D(toucher)/4;
 
 				if (toucher->momz > 0)
 					special->momz += toucher->momz/8;
@@ -1760,7 +1758,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				if (macespin)
 				{
 					player->powers[pw_carry] = CR_MACESPIN;
-					S_StartSound(toucher, sfx_spin);
+					S_StartSoundFromMobj(toucher, sfx_spin);
 					P_SetMobjState(toucher, S_PLAY_ROLL);
 				}
 				else
@@ -1784,7 +1782,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				special->target->momz = 0;
 				special->target->flags |= MF_NOGRAVITY;
 				P_SetMobjState(special->target, special->info->raisestate);
-				S_StartSound(special->target, special->info->activesound);
+				S_StartSoundFromMobj(special->target, special->info->activesound);
 				P_RemoveMobj(special);
 			}
 			return;
@@ -1821,7 +1819,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			if (!player->climbing)
 			{
 				if (player->bot && player->bot != BOT_MPAI && !P_IsPlayerInState(player, S_PLAY_GASP))
-					S_StartSound(toucher, special->info->deathsound); // Force it to play a sound for bots
+					S_StartSoundFromMobj(toucher, special->info->deathsound); // Force it to play a sound for bots
 				P_SetMobjState(toucher, S_PLAY_GASP);
 				P_ResetPlayer(player);
 			}
@@ -1840,7 +1838,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 				special->momz = 0;
 				special->flags |= MF_NOGRAVITY;
 				P_SetMobjState(special, special->info->deathstate);
-				S_StartSound(special, special->info->deathsound+(P_RandomKey(special->info->mass)));
+				S_StartSoundFromMobj(special, special->info->deathsound+(P_RandomKey(special->info->mass)));
 			}
 			return;
 
@@ -1889,7 +1887,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 				toucher->momx = toucher->tracer->momx/2;
 				toucher->momy = toucher->tracer->momy/2;
-				toucher->momz = toucher->tracer->momz + P_AproxDistance(toucher->tracer->momx, toucher->tracer->momy)/2;
+				toucher->momz = toucher->tracer->momz + P_GetMobjMomentum2D(toucher->tracer)/2;
 				P_ResetPlayer(player);
 				player->pflags &= ~PF_APPLYAUTOBRAKE;
 				P_SetMobjState(toucher, S_PLAY_FALL);
@@ -1924,7 +1922,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 		}
 	}
 
-	S_StartSound(toucher, special->info->deathsound); // was NULL, but changed to player so you could hear others pick up rings
+	S_StartSoundFromMobj(toucher, special->info->deathsound); // was NULL, but changed to player so you could hear others pick up rings
 	P_KillMobj(special, NULL, toucher, 0);
 	special->shadowscale = 0;
 }
@@ -1949,7 +1947,7 @@ void P_TouchStarPost(mobj_t *post, player_t *player, boolean snaptopost)
 	{
 		// blatant reuse of a variable that's normally unused in circuit
 		if (!player->tossdelay)
-			S_StartSound(toucher, sfx_lose);
+			S_StartSoundFromMobj(toucher, sfx_lose);
 		player->tossdelay = 3;
 		return;
 	}
@@ -1990,7 +1988,7 @@ void P_TouchStarPost(mobj_t *post, player_t *player, boolean snaptopost)
 					P_SpectatorJoinGame(&players[i]); //players[i].playerstate = PST_REBORN;
 			}
 		}
-		S_StartSound(NULL, post->info->painsound);
+		S_StartSoundFromEverywhere(post->info->painsound);
 	}
 	else
 	{
@@ -2007,7 +2005,7 @@ void P_TouchStarPost(mobj_t *post, player_t *player, boolean snaptopost)
 			player->starpostz += post->height>>FRACBITS;
 		}
 		player->starpostnum = post->health;
-		S_StartSound(toucher, post->info->painsound);
+		S_StartSoundFromMobj(toucher, post->info->painsound);
 	}
 
 	P_ClearStarPost(post->health);
@@ -2304,7 +2302,7 @@ void P_CheckTimeLimit(void)
 		{
 			// Play the starpost sfx after the first second of overtime.
 			if (gamestate == GS_LEVEL && (leveltime == (timelimitintics + TICRATE)))
-				S_StartSound(NULL, sfx_strpst);
+				S_StartSoundFromEverywhere(sfx_strpst);
 
 			// Normal Match
 			if (!G_GametypeHasTeams())
@@ -2801,7 +2799,7 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 
 		case MT_BUGGLE:
 			if (inflictor && inflictor->player // did a player kill you? Spawn relative to the player so they're bound to get it
-			&& P_AproxDistance(inflictor->x - target->x, inflictor->y - target->y) <= inflictor->radius + target->radius + FixedMul(8*FRACUNIT, inflictor->scale) // close enough?
+			&& P_AreMobjsClose2D(inflictor, target, inflictor->radius + target->radius + FixedMul(8*FRACUNIT, inflictor->scale)) // close enough?
 			&& inflictor->z <= target->z + target->height + FixedMul(8*FRACUNIT, inflictor->scale)
 			&& inflictor->z + inflictor->height >= target->z - FixedMul(8*FRACUNIT, inflictor->scale))
 				mo = P_SpawnMobj(inflictor->x + inflictor->momx, inflictor->y + inflictor->momy, inflictor->z + (inflictor->height / 2) + inflictor->momz, MT_EXTRALARGEBUBBLE);
@@ -2895,7 +2893,7 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 					if (++i == 2) // we've already removed 2 of these, let's stop now
 						break;
 					else
-						S_StartSound(mo, mo->info->deathsound); // done once to prevent sound stacking
+						S_StartSoundFromMobj(mo, mo->info->deathsound); // done once to prevent sound stacking
 				}
 			}
 			break;
@@ -2904,7 +2902,7 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 			if (inflictor)
 			{
 				fixed_t dx = target->x - inflictor->x, dy = target->y - inflictor->y, dz = target->z - inflictor->z;
-				fixed_t dm = FixedHypot(dz, FixedHypot(dy, dx));
+				fixed_t dm = GetDistance3D(0, 0, 0, dy, dx, dz);
 				target->momx = FixedDiv(FixedDiv(dx, dm), dm)*512;
 				target->momy = FixedDiv(FixedDiv(dy, dm), dm)*512;
 				target->momz = FixedDiv(FixedDiv(dz, dm), dm)*512;
@@ -2946,16 +2944,16 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 				{
 					target->movedir = damagetype; // we're MOVING the Damage Into anotheR function... Okay, this is a bit of a hack.
 					if (target->player->charflags & SF_MACHINE)
-						S_StartSound(target, sfx_fizzle);
+						S_StartSoundFromMobj(target, sfx_fizzle);
 					else
-						S_StartSound(target, sfx_drown);
+						S_StartSoundFromMobj(target, sfx_drown);
 					// Don't jump up when drowning
 				}
 				else
 				{
 					P_SetObjectMomZ(target, 14*FRACUNIT, false);
 					if (damagetype == DMG_SPIKE) // Spikes
-						S_StartSound(target, sfx_spkdth);
+						S_StartSoundFromMobj(target, sfx_spkdth);
 					else
 						P_PlayDeathSound(target);
 				}
@@ -2981,7 +2979,7 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 		mobj_t *chunk;
 		fixed_t momz;
 
-		S_StartSound(target, target->info->deathsound);
+		S_StartSoundFromMobj(target, target->info->deathsound);
 
 		if (target->info->xdeathstate != S_NULL)
 		{
@@ -3058,7 +3056,7 @@ void P_KillMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source, UINT8 damaget
 		mobj_t *chunk;
 		boolean sprflip;
 
-		S_StartSound(target, target->info->deathsound);
+		S_StartSoundFromMobj(target, target->info->deathsound);
 		if (!P_MobjWasRemoved(target->tracer))
 			P_RemoveMobj(target->tracer);
 
@@ -3189,7 +3187,7 @@ static void P_NiGHTSDamage(mobj_t *target, mobj_t *source)
 
 		player->powers[pw_flashing] = flashingtics;
 		P_SetMobjState(target, S_PLAY_NIGHTS_STUN);
-		S_StartSound(target, sfx_nghurt);
+		S_StartSoundFromMobj(target, sfx_nghurt);
 
 		player->mo->spriteroll = 0;
 
@@ -3204,7 +3202,7 @@ static void P_NiGHTSDamage(mobj_t *target, mobj_t *source)
 			)
 			{
 				S_FadeMusic(0, 10*MUSICRATE);
-				S_StartSound(NULL, sfx_timeup); // that creepy "out of time" music from NiGHTS.
+				S_StartSoundFromEverywhere(sfx_timeup); // that creepy "out of time" music from NiGHTS.
 			}
 			else
 				P_PlayJingle(player, ((maptol & TOL_NIGHTS) && !G_IsSpecialStage(gamemap)) ? JT_NIGHTSTIMEOUT : JT_SSTIMEOUT);
@@ -3234,7 +3232,7 @@ static boolean P_TagDamage(mobj_t *target, mobj_t *inflictor, mobj_t *source, IN
 			if (player->revitem != MT_LHRT && player->spinitem != MT_LHRT && player->thokitem != MT_LHRT) // Healers do not get to heal other healers.
 			{
 				P_SwitchShield(player, SH_PINK);
-				S_StartSound(target, mobjinfo[MT_PITY_ICON].seesound);
+				S_StartSoundFromMobj(target, mobjinfo[MT_PITY_ICON].seesound);
 			}
 		}
 		return false;
@@ -3250,7 +3248,7 @@ static boolean P_TagDamage(mobj_t *target, mobj_t *inflictor, mobj_t *source, IN
 			if (player->revitem != MT_LHRT && player->spinitem != MT_LHRT && player->thokitem != MT_LHRT) // Healers do not get to heal other healers.
 			{
 				P_SwitchShield(player, SH_PINK);
-				S_StartSound(target, mobjinfo[MT_PITY_ICON].seesound);
+				S_StartSoundFromMobj(target, mobjinfo[MT_PITY_ICON].seesound);
 			}
 		}
 		else if (!(inflictor->flags & MF_FIRE))
@@ -3290,7 +3288,7 @@ static boolean P_TagDamage(mobj_t *target, mobj_t *inflictor, mobj_t *source, IN
 	if (player->powers[pw_shield])
 	{
 		P_RemoveShield(player);
-		S_StartSound(target, sfx_shldls);
+		S_StartSoundFromMobj(target, sfx_shldls);
 		return true;
 	}
 
@@ -3335,7 +3333,7 @@ static boolean P_PlayerHitsPlayer(mobj_t *target, mobj_t *inflictor, mobj_t *sou
 				if (player->revitem != MT_LHRT && player->spinitem != MT_LHRT && player->thokitem != MT_LHRT) // Healers do not get to heal other healers.
 				{
 					P_SwitchShield(player, SH_PINK);
-					S_StartSound(target, mobjinfo[MT_PITY_ICON].seesound);
+					S_StartSoundFromMobj(target, mobjinfo[MT_PITY_ICON].seesound);
 				}
 			}
 			return false;
@@ -3358,7 +3356,7 @@ static boolean P_PlayerHitsPlayer(mobj_t *target, mobj_t *inflictor, mobj_t *sou
 				if (player->revitem != MT_LHRT && player->spinitem != MT_LHRT && player->thokitem != MT_LHRT) // Healers do not get to heal other healers.
 				{
 					P_SwitchShield(player, SH_PINK);
-					S_StartSound(target, mobjinfo[MT_PITY_ICON].seesound);
+					S_StartSoundFromMobj(target, mobjinfo[MT_PITY_ICON].seesound);
 				}
 			}
 			else if (!(inflictor->flags & MF_FIRE))
@@ -3433,7 +3431,7 @@ static void P_KillPlayer(player_t *player, mobj_t *source, INT32 damage)
 	// If the player was super, tell them he/she ain't so super nomore.
 	if (!G_CoopGametype() && player->powers[pw_super])
 	{
-		S_StartSound(NULL, sfx_s3k66); //let all players hear it.
+		S_StartSoundFromEverywhere(sfx_s3k66); //let all players hear it.
 		HU_SetCEchoFlags(0);
 		HU_SetCEchoDuration(5);
 		HU_DoCEcho(va("%s\\is no longer super.\\\\\\\\", player_names[player-players]));
@@ -3463,7 +3461,7 @@ static void P_SuperDamage(player_t *player, mobj_t *inflictor, mobj_t *source, I
 	// to recover
 	if (inflictor->flags2 & MF2_SCATTER && source)
 	{
-		fixed_t dist = P_AproxDistance(P_AproxDistance(source->x-player->mo->x, source->y-player->mo->y), source->z-player->mo->z);
+		fixed_t dist = P_GetMobjDistance3D(source, player->mo);
 
 		dist = FixedMul(128*FRACUNIT, inflictor->scale) - dist/4;
 
@@ -3534,9 +3532,9 @@ static void P_ShieldDamage(player_t *player, mobj_t *inflictor, mobj_t *source, 
 	P_ForceFeed(player, 40, 10, TICRATE, 40 + min(damage, 100)*2);
 
 	if (damagetype == DMG_SPIKE) // spikes
-		S_StartSound(player->mo, sfx_spkdth);
+		S_StartSoundFromMobj(player->mo, sfx_spkdth);
 	else
-		S_StartSound (player->mo, sfx_shldls); // Ba-Dum! Shield loss.
+	S_StartSoundFromMobj(player->mo, sfx_shldls); // Ba-Dum! Shield loss.
 
 	if ((gametyperules & GTR_TEAMFLAGS) && (player->gotflag & (GF_REDFLAG|GF_BLUEFLAG)))
 	{
@@ -3563,7 +3561,7 @@ static void P_RingDamage(player_t *player, mobj_t *inflictor, mobj_t *source, IN
 	P_ForceFeed(player, 40, 10, TICRATE, 40 + min(damage, 100)*2);
 
 	if (damagetype == DMG_SPIKE) // spikes
-		S_StartSound(player->mo, sfx_spkdth);
+		S_StartSoundFromMobj(player->mo, sfx_spkdth);
 
 	if (source && source->player && source->player != player && !player->powers[pw_super]) //don't score points against super players
 	{
@@ -3622,7 +3620,7 @@ void P_SpecialStageDamage(player_t *player, mobj_t *inflictor, mobj_t *source)
 			if (player->revitem != MT_LHRT && player->spinitem != MT_LHRT && player->thokitem != MT_LHRT) // Healers do not get to heal other healers.
 			{
 				P_SwitchShield(player, SH_PINK);
-				S_StartSound(player->mo, mobjinfo[MT_PITY_ICON].seesound);
+				S_StartSoundFromMobj(player->mo, mobjinfo[MT_PITY_ICON].seesound);
 			}
 		}
 
@@ -3636,11 +3634,11 @@ void P_SpecialStageDamage(player_t *player, mobj_t *inflictor, mobj_t *source)
 	if (player->powers[pw_shield] || (player->bot && player->bot != BOT_MPAI))  //If One-Hit Shield
 	{
 		P_RemoveShield(player);
-		S_StartSound(player->mo, sfx_shldls); // Ba-Dum! Shield loss.
+		S_StartSoundFromMobj(player->mo, sfx_shldls); // Ba-Dum! Shield loss.
 	}
 	else
 	{
-		S_StartSound(player->mo, sfx_nghurt);
+		S_StartSoundFromMobj(player->mo, sfx_nghurt);
 		if (player->nightstime > 5*TICRATE)
 			player->nightstime -= 5*TICRATE;
 		else
@@ -3658,7 +3656,7 @@ void P_SpecialStageDamage(player_t *player, mobj_t *inflictor, mobj_t *source)
 		if (mapheaderinfo[gamemap-1]->levelflags & LF_MIXNIGHTSCOUNTDOWN)
 		{
 			S_FadeMusic(0, 10*MUSICRATE);
-			S_StartSound(NULL, sfx_timeup); // that creepy "out of time" music from NiGHTS.
+			S_StartSoundFromEverywhere(sfx_timeup); // that creepy "out of time" music from NiGHTS.
 		}
 		else
 			S_ChangeMusicInternal((((maptol & TOL_NIGHTS) && !G_IsSpecialStage(gamemap)) ? "_ntime" : "_drown"), false);

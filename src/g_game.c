@@ -162,6 +162,8 @@ INT16 nextmapoverride;
 UINT8 skipstats;
 INT16 nextgametype = -1;
 
+boolean keepcutscene;
+
 // Pointers to each CTF flag
 mobj_t *redflag;
 mobj_t *blueflag;
@@ -1411,7 +1413,7 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics, UINT8 ssplayer)
 
 		ticcmd_centerviewdown[forplayer] = true;
 	}
-	else if (ticcmd_centerviewdown[forplayer] || (leveltime < 5))
+	else if (ticcmd_centerviewdown[forplayer])
 	{
 		if (controlstyle == CS_SIMPLE)
 		{
@@ -1426,7 +1428,8 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics, UINT8 ssplayer)
 	{
 		if (
 			P_MobjWasRemoved(ticcmd_ztargetfocus[forplayer]) ||
-			(leveltime < 5) ||
+			(cv_directionchar[forplayer].value != 2) ||
+			(R_PointToDist2(player->mo->x, player->mo->y, ticcmd_ztargetfocus[forplayer]->x, ticcmd_ztargetfocus[forplayer]->y) > 3000<<FRACBITS) || // Locks on to the wrong mobj if too far away, so just cancel it
 			(player->playerstate != PST_LIVE) ||
 			player->exiting ||
 			!ticcmd_ztargetfocus[forplayer]->health ||
@@ -1460,9 +1463,11 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics, UINT8 ssplayer)
 			P_SetTarget(&newtarget->target, ticcmd_ztargetfocus[forplayer]);
 			newtarget->drawonlyforplayer = player; // Hide it from the other player in splitscreen, and yourself when spectating
 
-			if (player->mo && R_PointToDist2(0, 0,
-				player->mo->x - ticcmd_ztargetfocus[forplayer]->x,
-				player->mo->y - ticcmd_ztargetfocus[forplayer]->y
+			if (player->mo && GetDistance2D(
+				ticcmd_ztargetfocus[forplayer]->x,
+				ticcmd_ztargetfocus[forplayer]->y,
+				player->mo->x,
+				player->mo->y
 			) > 50*player->mo->scale)
 			{
 				INT32 anglediff = R_PointToAngle2(player->mo->x, player->mo->y, ticcmd_ztargetfocus[forplayer]->x, ticcmd_ztargetfocus[forplayer]->y) - *myangle;
@@ -1479,8 +1484,20 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics, UINT8 ssplayer)
 		}
 	}
 
-	if (ticcmd_centerviewdown[forplayer] && controlstyle == CS_SIMPLE)
-		controlstyle = CS_LEGACY;
+	if (ticcmd_centerviewdown[forplayer] && chasecam)
+	{
+		if (controlstyle == CS_SIMPLE)
+			controlstyle = CS_LEGACY;
+	}
+	else if (cv_directionchar[forplayer].value == 2)
+	{
+		if (P_MobjWasRemoved(ticcmd_ztargetfocus[forplayer]) || !chasecam)
+		{
+			P_SetTarget(&ticcmd_ztargetfocus[forplayer], NULL);
+			CV_SetValue(&cv_directionchar[forplayer], 1);
+		}
+
+	}
 
 	if (PLAYERINPUTDOWN(ssplayer, GC_CAMRESET))
 	{
@@ -3164,6 +3181,7 @@ void G_DoReborn(INT32 playernum)
 					nextmapoverride = gamemap;
 					countdown2 = TICRATE;
 					skipstats = 2;
+					keepcutscene = 0;
 
 					for (i = 0; i < MAXPLAYERS; i++)
 					{
@@ -4214,7 +4232,7 @@ void G_AfterIntermission(void)
 
 	if ((gametyperules & GTR_CUTSCENES) && mapheaderinfo[gamemap-1]->cutscenenum
 		&& !modeattacking
-		&& skipstats <= 1
+		&& (skipstats <= 1 || keepcutscene == true)
 		&& (gamecomplete || !(marathonmode & MA_NOCUTSCENES))
 		&& stagefailed == false)
 	{
@@ -4340,6 +4358,8 @@ static void G_DoContinued(void)
 // when something new is added.
 void G_EndGame(void)
 {
+	LUA_HookVoid(HOOK(GameEnd));
+
 	// Only do evaluation and credits in coop games.
 	if (gametyperules & GTR_CUTSCENES)
 	{

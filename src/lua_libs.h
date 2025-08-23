@@ -30,6 +30,8 @@ extern boolean ignoregameinputs;
 #define META_SKINCOLOR "SKINCOLOR_T*"
 #define META_COLORRAMP "SKINCOLOR_T*RAMP"
 #define META_SPRITEINFO "SPRITEINFO_T*"
+#define META_SPRITEINFOFRAMELIST "SPRITEINFOFRAME_T[]"
+#define META_SPRITEINFOFRAME "SPRITEINFOFRAME_T*"
 #define META_PIVOTLIST "SPRITEFRAMEPIVOT_T[]"
 #define META_FRAMEPIVOT "SPRITEFRAMEPIVOT_T*"
 
@@ -47,19 +49,15 @@ extern boolean ignoregameinputs;
 #define META_SKINSPRITESLIST "SKIN_T*SKINSPRITES[]"
 #define META_SKINSPRITESCOMPAT "SKIN_T*SPRITES" // TODO: 2.3: Delete
 
+#define META_MUSICDEF "MUSICDEF_T*"
+
 #define META_VERTEX "VERTEX_T*"
 #define META_LINE "LINE_T*"
 #define META_SIDE "SIDE_T*"
 #define META_SUBSECTOR "SUBSECTOR_T*"
 #define META_SECTOR "SECTOR_T*"
 #define META_FFLOOR "FFLOOR_T*"
-#ifdef HAVE_LUA_SEGS
-#define META_SEG "SEG_T*"
-#define META_NODE "NODE_T*"
-#endif
 #define META_SLOPE "PSLOPE_T*"
-#define META_VECTOR2 "VECTOR2_T"
-#define META_VECTOR3 "VECTOR3_T"
 #define META_MAPHEADER "MAPHEADER_T*"
 
 #define META_POLYOBJ "POLYOBJ_T*"
@@ -70,17 +68,17 @@ extern boolean ignoregameinputs;
 #ifdef MUTABLE_TAGS
 #define META_SECTORTAGLIST "sector_t.taglist"
 #endif
+#define META_SECTORCUSTOMARGS "SECTOR_T*CUSTOMARGS"
 #define META_SIDENUM "LINE_T*SIDENUM"
 #define META_LINEARGS "LINE_T*ARGS"
 #define META_LINESTRINGARGS "LINE_T*STRINGARGS"
+#define META_LINECUSTOMARGS "LINE_T*CUSTOMARGS"
+#define META_SIDECUSTOMARGS "SIDE_T*CUSTOMARGS"
 #define META_THINGARGS "MAPTHING_T*ARGS"
 #define META_THINGSTRINGARGS "MAPTHING_T*STRINGARGS"
+#define META_THINGCUSTOMARGS "MAPTHING_T*CUSTOMARGS"
 #define META_POLYOBJVERTICES "POLYOBJ_T*VERTICES"
 #define META_POLYOBJLINES "POLYOBJ_T*LINES"
-#ifdef HAVE_LUA_SEGS
-#define META_NODEBBOX "NODE_T*BBOX"
-#define META_NODECHILDREN "NODE_T*CHILDREN"
-#endif
 
 #define META_BBOX "BOUNDING_BOX"
 
@@ -99,6 +97,11 @@ extern boolean ignoregameinputs;
 #define META_MOUSE "MOUSE_T*"
 
 #define META_INTERCEPT "INTERCEPT_T*"
+
+#define META_VECTOR2 "VECTOR2_T"
+#define META_VECTOR3 "VECTOR3_T"
+#define META_MATRIX "MATRIX_T"
+#define META_QUATERNION "QUATERNION_T"
 
 boolean luaL_checkboolean(lua_State *L, int narg);
 
@@ -121,6 +124,9 @@ int LUA_HudLib(lua_State *L);
 int LUA_ColorLib(lua_State *L);
 int LUA_InputLib(lua_State *L);
 int LUA_InterceptLib(lua_State *L);
+int LUA_MatrixLib(lua_State *L);
+int LUA_QuaternionLib(lua_State *L);
+int LUA_VectorLib(lua_State *L);
 #ifdef HAVE_LIBAV
 int LUA_MovieLib(lua_State *L);
 #endif
