@@ -63,7 +63,9 @@ static lua_CFunction liblist[] = {
 	LUA_ColorLib, // general color functions
 	LUA_InputLib, // inputs
 	LUA_InterceptLib, // intercept_t
+#ifdef HAVE_LIBAV
 	LUA_MovieLib, // movie
+#endif
 	NULL
 };
 
