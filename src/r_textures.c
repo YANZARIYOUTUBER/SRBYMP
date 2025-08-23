@@ -636,7 +636,18 @@ INT32 R_GetTextureNum(INT32 texnum)
 void R_CheckTextureCache(INT32 tex)
 {
 	if (!texturecache[tex])
+	{
+		if (tex == movietexturenum)
+		{
+			textures[tex]->width = 64;
+			textures[tex]->height = 64;
+			texturewidth[tex] = 64;
+			textureheight[tex] = 64;
+		}
+
 		R_GenerateTexture(tex);
+	}
+
 	if (tex == movietexturenum)
 		R_CheckMovieTextureCache(activemovie, tex);
 }
