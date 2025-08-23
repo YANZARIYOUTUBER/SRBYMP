@@ -6,10 +6,10 @@
 // terms of the GNU General Public License, version 2.
 // See the 'LICENSE' file for more details.
 //-----------------------------------------------------------------------------
-/// \file  movie_decode.c
-/// \brief Movie decoding using FFmpeg
+/// \file  movie_decode_libav.c
+/// \brief Movie decoding implementation using FFmpeg's libav
 
-#include "movie_decode.h"
+#include "movie_decode_libav.h"
 #include "byteptr.h"
 #include "doomdef.h"
 #include "doomtype.h"
