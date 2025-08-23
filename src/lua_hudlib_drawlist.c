@@ -16,6 +16,7 @@
 
 #include "v_video.h"
 #include "z_zone.h"
+#include "movie_decode.h"
 
 enum drawitem_e {
 	DI_Draw = 0,
@@ -29,6 +30,7 @@ enum drawitem_e {
 	DI_DrawNameTag,
 	DI_DrawScaledNameTag,
 	DI_DrawLevelTitle,
+	DI_DrawMovie,
 	DI_FadeScreen,
 	DI_MAX,
 };
@@ -45,6 +47,7 @@ typedef struct drawitem_s {
 	fixed_t hscale;
 	fixed_t vscale;
 	patch_t *patch;
+	movie_t *movie;
 	INT32 flags;
 	UINT16 basecolor;
 	UINT16 outlinecolor;
@@ -434,6 +437,25 @@ void LUA_HUD_AddDrawLevelTitle(
 	item->flags = flags;
 }
 
+void LUA_HUD_AddDrawMovie(
+	huddrawlist_h list,
+	fixed_t x,
+	fixed_t y,
+	fixed_t scale,
+	movie_t *movie,
+	INT32 flags
+)
+{
+	size_t i = AllocateDrawItem(list);
+	drawitem_t *item = &list->items[i];
+	item->type = DI_DrawMovie;
+	item->x = x;
+	item->y = y;
+	item->scale = scale;
+	item->movie = movie;
+	item->flags = flags;
+}
+
 void LUA_HUD_AddFadeScreen(
 	huddrawlist_h list,
 	UINT16 color,
@@ -570,6 +592,9 @@ void LUA_HUD_DrawList(huddrawlist_h list)
 				break;
 			case DI_DrawLevelTitle:
 				V_DrawLevelTitle(item->x, item->y, item->flags, item->str);
+				break;
+			case DI_DrawMovie:
+				V_DrawMovie(item->x, item->y, item->scale, item->scale, item->flags, item->movie);
 				break;
 			case DI_FadeScreen:
 				V_DrawFadeScreen(item->color, item->strength);

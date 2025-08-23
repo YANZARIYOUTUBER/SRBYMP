@@ -30,6 +30,7 @@
 #include "../p_local.h" // stplyr
 #include "../g_game.h" // players
 #include "../f_finale.h" // fade color factors
+#include "../movie_decode.h"
 
 #include <fcntl.h>
 #include "../i_video.h"
@@ -592,6 +593,231 @@ void HWR_DrawCroppedPatch(patch_t *gpatch, fixed_t x, fixed_t y, fixed_t pscale,
 		HWD.pfnDrawPolygon(NULL, v, 4, flags);
 }
 
+void HWR_DrawMovie(movie_t *movie, fixed_t x, fixed_t y, fixed_t pscale, fixed_t vscale, INT32 option)
+{
+	FOutVector v[4];
+	FBITFIELD flags;
+	float cx = FIXED_TO_FLOAT(x);
+	float cy = FIXED_TO_FLOAT(y);
+	UINT8 alphalevel = ((option & V_ALPHAMASK) >> V_ALPHASHIFT);
+	UINT8 blendmode = ((option & V_BLENDMASK) >> V_BLENDSHIFT);
+	UINT8 opacity = 0xFF;
+	INT32 width, height;
+
+//  3--2
+//  | /|
+//  |/ |
+//  0--1
+	float dup, fscalew, fscaleh, fwidth, fheight;
+
+	UINT8 perplayershuffle = 0;
+
+	if (!HWR_GetMovieTexture(movie))
+		return;
+
+	HWR_SetMovieAsCurrentTexture(movie);
+
+	MovieDecode_GetDimensions(movie, &width, &height);
+
+	if (alphalevel)
+	{
+		if (alphalevel == 10) opacity = softwaretranstogl_lo[st_translucency]; // V_HUDTRANSHALF
+		else if (alphalevel == 11) opacity = softwaretranstogl[st_translucency]; // V_HUDTRANS
+		else if (alphalevel == 12) opacity = softwaretranstogl_hi[st_translucency]; // V_HUDTRANSDOUBLE
+		else opacity = softwaretranstogl[10-alphalevel];
+	}
+
+	dup = (float)vid.dup;
+
+	switch (option & V_SCALEPATCHMASK)
+	{
+	case V_NOSCALEPATCH:
+		dup = 1.0f;
+		break;
+	case V_SMALLSCALEPATCH:
+		dup = (float)vid.smalldup;
+		break;
+	case V_MEDSCALEPATCH:
+		dup = (float)vid.meddup;
+		break;
+	}
+
+	fscalew = fscaleh = FIXED_TO_FLOAT(pscale);
+	if (vscale != pscale)
+		fscaleh = FIXED_TO_FLOAT(vscale);
+
+	// See my comments in v_video.c's V_DrawFixedPatch
+	// -- Monster Iestyn 29/10/18
+	{
+		float offsetx = 0.0f, offsety = 0.0f;
+
+		// left offset
+		if (option & V_FLIP)
+			offsetx = (float)width * fscalew;
+
+		cx -= offsetx;
+		cy -= offsety;
+	}
+
+	if (splitscreen && (option & V_PERPLAYER))
+	{
+		float adjusty = ((option & V_NOSCALESTART) ? vid.height : BASEVIDHEIGHT)/2.0f;
+		fscaleh /= 2;
+		cy /= 2;
+#ifdef QUADS
+		if (splitscreen > 1) // 3 or 4 players
+		{
+			float adjustx = ((option & V_NOSCALESTART) ? vid.width : BASEVIDWIDTH)/2.0f;
+			fscalew /= 2;
+			cx /= 2;
+			if (stplyr == &players[displayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 1;
+				if (!(option & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 4;
+				option &= ~V_SNAPTOBOTTOM|V_SNAPTORIGHT;
+			}
+			else if (stplyr == &players[secondarydisplayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 1;
+				if (!(option & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 8;
+				cx += adjustx;
+				option &= ~V_SNAPTOBOTTOM|V_SNAPTOLEFT;
+			}
+			else if (stplyr == &players[thirddisplayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 2;
+				if (!(option & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 4;
+				cy += adjusty;
+				option &= ~V_SNAPTOTOP|V_SNAPTORIGHT;
+			}
+			else if (stplyr == &players[fourthdisplayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 2;
+				if (!(option & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 8;
+				cx += adjustx;
+				cy += adjusty;
+				option &= ~V_SNAPTOTOP|V_SNAPTOLEFT;
+			}
+		}
+		else
+#endif
+		// 2 players
+		{
+			if (stplyr == &players[displayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle = 1;
+				option &= ~V_SNAPTOBOTTOM;
+			}
+			else //if (stplyr == &players[secondarydisplayplayer])
+			{
+				if (!(option & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle = 2;
+				cy += adjusty;
+				option &= ~V_SNAPTOTOP;
+			}
+		}
+	}
+
+	if (!(option & V_NOSCALESTART))
+	{
+		cx = cx * dup;
+		cy = cy * dup;
+
+		if (!(option & V_SCALEPATCHMASK))
+		{
+			// centre screen
+			if (fabsf((float)vid.width - (float)BASEVIDWIDTH * dup) > 1.0E-36f)
+			{
+				if (option & V_SNAPTORIGHT)
+					cx += ((float)vid.width - ((float)BASEVIDWIDTH * dup));
+				else if (!(option & V_SNAPTOLEFT))
+					cx += ((float)vid.width - ((float)BASEVIDWIDTH * dup))/2;
+				if (perplayershuffle & 4)
+					cx -= ((float)vid.width - ((float)BASEVIDWIDTH * dup))/4;
+				else if (perplayershuffle & 8)
+					cx += ((float)vid.width - ((float)BASEVIDWIDTH * dup))/4;
+			}
+			if (fabsf((float)vid.height - (float)BASEVIDHEIGHT * dup) > 1.0E-36f)
+			{
+				if (option & V_SNAPTOBOTTOM)
+					cy += ((float)vid.height - ((float)BASEVIDHEIGHT * dup));
+				else if (!(option & V_SNAPTOTOP))
+					cy += ((float)vid.height - ((float)BASEVIDHEIGHT * dup))/2;
+				if (perplayershuffle & 1)
+					cy -= ((float)vid.height - ((float)BASEVIDHEIGHT * dup))/4;
+				else if (perplayershuffle & 2)
+					cy += ((float)vid.height - ((float)BASEVIDHEIGHT * dup))/4;
+			}
+		}
+	}
+
+	if (pscale != FRACUNIT || vscale != FRACUNIT || (splitscreen && option & V_PERPLAYER))
+	{
+		fwidth = (float)width * fscalew * dup;
+		fheight = (float)height * fscaleh * dup;
+	}
+	else
+	{
+		fwidth = (float)width * dup;
+		fheight = (float)height * dup;
+	}
+
+	// positions of the cx, cy, are between 0 and vid.width/vid.height now, we need them to be between -1 and 1
+	cx = -1.0f + (cx / (vid.width / 2.0f));
+	cy = 1.0f - (cy / (vid.height / 2.0f));
+
+	// fwidth and fheight are similar
+	fwidth /= vid.width / 2;
+	fheight /= vid.height / 2;
+
+	// set the polygon vertices to the right positions
+	v[0].x = v[3].x = cx;
+	v[2].x = v[1].x = cx + fwidth;
+
+	v[0].y = v[1].y = cy;
+	v[2].y = v[3].y = cy - fheight;
+
+	v[0].z = v[1].z = v[2].z = v[3].z = 1.0f;
+
+	if (option & V_FLIP)
+	{
+		v[0].s = v[3].s = 1.0f;
+		v[2].s = v[1].s = 0.0f;
+	}
+	else
+	{
+		v[0].s = v[3].s = 0.0f;
+		v[2].s = v[1].s = 1.0f;
+	}
+
+	v[0].t = v[1].t = 0.0f;
+	v[2].t = v[3].t = 1.0f;
+
+	// clip it since it is used for bunny scroll in doom I
+	flags = HWR_GetBlendModeFlag(blendmode+1)|PF_NoDepthTest;
+
+	if (alphalevel)
+	{
+		FSurfaceInfo Surf;
+		Surf.PolyColor.s.red = Surf.PolyColor.s.green = Surf.PolyColor.s.blue = 0xff;
+
+		Surf.PolyColor.s.alpha = opacity;
+		flags |= PF_Modulated;
+		HWD.pfnDrawPolygon(&Surf, v, 4, flags);
+	}
+	else
+		HWD.pfnDrawPolygon(NULL, v, 4, flags);
+}
+
 // ==========================================================================
 //                                                            V_VIDEO.C STUFF
 // ==========================================================================
@@ -622,8 +848,8 @@ void HWR_DrawFlatFill(INT32 x, INT32 y, INT32 w, INT32 h, lumpnum_t flatlumpnum)
     */
 
 	if (fw <= 0 || fh <= 0)
-		return;	
-	
+		return;
+
 	if (fabsf((float)vid.width - (float)BASEVIDWIDTH * vid.dup) > 1.0E-36f)
 	{
 		fx += ((float)vid.width - ((float)BASEVIDWIDTH * vid.dup)) / 2;
@@ -635,17 +861,17 @@ void HWR_DrawFlatFill(INT32 x, INT32 y, INT32 w, INT32 h, lumpnum_t flatlumpnum)
 
 	if (fx >= vid.width || fy >= vid.height)
 	    return;
-	  
+
 	fx = -1.0f + (fx / (vid.width / 2.0f));
 	fy = 1.0f - (fy / (vid.height / 2.0f));
 	fw /= vid.width / 2;
 	fh /= vid.height / 2;
-	
+
 //  3--2
 //  | /|
 //  |/ |
 //  0--1
-	
+
     // position vertices
 	v[0].x = v[3].x = fx;
 	v[2].x = v[1].x = fx + fw;

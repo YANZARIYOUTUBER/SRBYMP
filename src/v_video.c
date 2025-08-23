@@ -29,6 +29,7 @@
 #include "m_misc.h"
 #include "m_random.h"
 #include "doomstat.h"
+#include "movie_decode.h"
 
 #ifdef HWRENDER
 #include "hardware/hw_glob.h"
@@ -1039,6 +1040,290 @@ void V_DrawCroppedPatch(fixed_t x, fixed_t y, fixed_t pscale, fixed_t vscale, IN
 				ofs = sy-(topdelta<<FRACBITS);
 
 			for (; dest < deststop && (size_t)(ofs>>FRACBITS) < post->length && ((ofs - sy) + (topdelta<<FRACBITS)) < h; ofs += rowfrac)
+			{
+				if (dest >= screens[scrn&V_PARAMMASK]) // don't draw off the top of the screen (CRASH PREVENTION)
+					*dest = patchdrawfunc(dest, source, ofs);
+				dest += vid.width;
+			}
+		}
+	}
+}
+
+// Draws the current movie frame scaled to an arbitrary size.
+void V_DrawMovie(fixed_t x, fixed_t y, fixed_t pscale, fixed_t vscale, INT32 scrn, void *movie)
+{
+	UINT8 (*patchdrawfunc)(const UINT8*, const UINT8*, fixed_t);
+	UINT32 alphalevel = ((scrn & V_ALPHAMASK) >> V_ALPHASHIFT);
+	UINT32 blendmode = ((scrn & V_BLENDMASK) >> V_BLENDSHIFT);
+
+	fixed_t col, ofs, colfrac, rowfrac, fdup, vdup;
+	INT32 dup;
+	column_t *column;
+	UINT8 *desttop, *dest, *deststart, *destend;
+	const UINT8 *source, *deststop;
+	fixed_t width;
+	INT32 moviewidth, movieheight;
+	column_t *moviecolumns;
+	fixed_t offx = 0; // x offset
+
+	UINT8 perplayershuffle = 0;
+
+	if (!movie)
+		return;
+
+	if (rendermode == render_none)
+		return;
+
+#ifdef HWRENDER
+	//if (rendermode != render_soft && !con_startup)		// Why?
+	if (rendermode == render_opengl)
+	{
+		HWR_DrawMovie(movie, x, y, pscale, vscale, scrn);
+		return;
+	}
+#endif
+
+	R_CheckTextureCache(movietexturenum);
+
+	moviewidth = textures[movietexturenum]->width;
+	movieheight = textures[movietexturenum]->height;
+	moviecolumns = texturecolumns[movietexturenum];
+
+	patchdrawfunc = standardpdraw;
+
+	v_translevel = NULL;
+	if (alphalevel || blendmode)
+	{
+		if (alphalevel == 10) // V_HUDTRANSHALF
+			alphalevel = hudminusalpha[st_translucency];
+		else if (alphalevel == 11) // V_HUDTRANS
+			alphalevel = 10 - st_translucency;
+		else if (alphalevel == 12) // V_HUDTRANSDOUBLE
+			alphalevel = hudplusalpha[st_translucency];
+
+		if (alphalevel >= 10)
+			return; // invis
+
+		if (alphalevel || blendmode)
+		{
+			v_translevel = R_GetBlendTable(blendmode+1, alphalevel);
+			patchdrawfunc = translucentpdraw;
+		}
+	}
+
+	dup = vid.dup;
+	if (scrn & V_SCALEPATCHMASK) switch (scrn & V_SCALEPATCHMASK)
+	{
+		case V_NOSCALEPATCH:
+			dup = 1;
+			break;
+		case V_SMALLSCALEPATCH:
+			dup = vid.smalldup;
+			break;
+		case V_MEDSCALEPATCH:
+			dup = vid.meddup;
+			break;
+	}
+
+	fdup = vdup = pscale * dup;
+	if (vscale != pscale)
+		vdup = vscale * dup;
+	colfrac = FixedDiv(FRACUNIT, fdup);
+	rowfrac = FixedDiv(FRACUNIT, vdup);
+
+	{
+		fixed_t offsetx = 0, offsety = 0;
+
+		// left offset
+		if (scrn & V_FLIP)
+			offsetx = FixedMul(moviewidth<<FRACBITS, pscale) + 1;
+		else
+			offsetx = 0;
+
+		// top offset
+		offsety = 0;
+
+		// Subtract the offsets from x/y positions
+		x -= offsetx;
+		y -= offsety;
+	}
+
+	if (splitscreen && (scrn & V_PERPLAYER))
+	{
+		fixed_t adjusty = ((scrn & V_NOSCALESTART) ? vid.height : BASEVIDHEIGHT)<<(FRACBITS-1);
+		vdup >>= 1;
+		rowfrac <<= 1;
+		y >>= 1;
+#ifdef QUADS
+		if (splitscreen > 1) // 3 or 4 players
+		{
+			fixed_t adjustx = ((scrn & V_NOSCALESTART) ? vid.height : BASEVIDHEIGHT)<<(FRACBITS-1));
+			fdup >>= 1;
+			colfrac <<= 1;
+			x >>= 1;
+			if (stplyr == &players[displayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 1;
+				if (!(scrn & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 4;
+				scrn &= ~V_SNAPTOBOTTOM|V_SNAPTORIGHT;
+			}
+			else if (stplyr == &players[secondarydisplayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 1;
+				if (!(scrn & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 8;
+				x += adjustx;
+				scrn &= ~V_SNAPTOBOTTOM|V_SNAPTOLEFT;
+			}
+			else if (stplyr == &players[thirddisplayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 2;
+				if (!(scrn & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 4;
+				y += adjusty;
+				scrn &= ~V_SNAPTOTOP|V_SNAPTORIGHT;
+			}
+			else //if (stplyr == &players[fourthdisplayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle |= 2;
+				if (!(scrn & (V_SNAPTOLEFT|V_SNAPTORIGHT)))
+					perplayershuffle |= 8;
+				x += adjustx;
+				y += adjusty;
+				scrn &= ~V_SNAPTOTOP|V_SNAPTOLEFT;
+			}
+		}
+		else
+#endif
+		// 2 players
+		{
+			if (stplyr == &players[displayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle = 1;
+				scrn &= ~V_SNAPTOBOTTOM;
+			}
+			else //if (stplyr == &players[secondarydisplayplayer])
+			{
+				if (!(scrn & (V_SNAPTOTOP|V_SNAPTOBOTTOM)))
+					perplayershuffle = 2;
+				y += adjusty;
+				scrn &= ~V_SNAPTOTOP;
+			}
+		}
+	}
+
+	desttop = screens[scrn&V_PARAMMASK];
+
+	if (!desttop)
+		return;
+
+	deststop = desttop + vid.rowbytes * vid.height;
+
+	if (scrn & V_NOSCALESTART)
+	{
+		x >>= FRACBITS;
+		y >>= FRACBITS;
+		desttop += (y*vid.width) + x;
+	}
+	else
+	{
+		x *= dup;
+		y *= dup;
+		x >>= FRACBITS;
+		y >>= FRACBITS;
+
+		// Center it if necessary
+		if (!(scrn & V_SCALEPATCHMASK))
+		{
+			// if it's meant to cover the whole screen, black out the rest (ONLY IF TOP LEFT ISN'T TRANSPARENT)
+			if (!v_translevel && x == 0 && moviewidth == BASEVIDWIDTH && y == 0 && movieheight == BASEVIDHEIGHT)
+			{
+				column = &moviecolumns[0];
+				if (column->num_posts && !column->posts[0].topdelta)
+				{
+					source = column->pixels;
+					V_DrawFill(0, 0, BASEVIDWIDTH, BASEVIDHEIGHT, source[0]);
+				}
+			}
+
+			if (vid.width != BASEVIDWIDTH * dup)
+			{
+				// dup adjustments pretend that screen width is BASEVIDWIDTH * dup,
+				// so center this imaginary screen
+				if (scrn & V_SNAPTORIGHT)
+					x += (vid.width - (BASEVIDWIDTH * dup));
+				else if (!(scrn & V_SNAPTOLEFT))
+					x += (vid.width - (BASEVIDWIDTH * dup)) / 2;
+				if (perplayershuffle & 4)
+					x -= (vid.width - (BASEVIDWIDTH * dup)) / 4;
+				else if (perplayershuffle & 8)
+					x += (vid.width - (BASEVIDWIDTH * dup)) / 4;
+			}
+			if (vid.height != BASEVIDHEIGHT * dup)
+			{
+				// same thing here
+				if (scrn & V_SNAPTOBOTTOM)
+					y += (vid.height - (BASEVIDHEIGHT * dup));
+				else if (!(scrn & V_SNAPTOTOP))
+					y += (vid.height - (BASEVIDHEIGHT * dup)) / 2;
+				if (perplayershuffle & 1)
+					y -= (vid.height - (BASEVIDHEIGHT * dup)) / 4;
+				else if (perplayershuffle & 2)
+					y += (vid.height - (BASEVIDHEIGHT * dup)) / 4;
+			}
+		}
+
+		desttop += (y*vid.width) + x;
+	}
+
+	if (pscale != FRACUNIT) // scale width properly
+	{
+		width = moviewidth<<FRACBITS;
+		width = FixedMul(width, pscale);
+		width *= dup;
+		width >>= FRACBITS;
+	}
+	else
+		width = moviewidth * dup;
+
+	deststart = desttop;
+	destend = desttop + width;
+
+	for (col = 0; (col>>FRACBITS) < moviewidth; col += colfrac, ++offx, desttop++)
+	{
+		if (scrn & V_FLIP) // offx is measured from right edge instead of left
+		{
+			if (x+width-offx < 0) // don't draw off the left of the screen (WRAP PREVENTION)
+				break;
+			if (x+width-offx >= vid.width) // don't draw off the right of the screen (WRAP PREVENTION)
+				continue;
+		}
+		else
+		{
+			if (x+offx < 0) // don't draw off the left of the screen (WRAP PREVENTION)
+				continue;
+			if (x+offx >= vid.width) // don't draw off the right of the screen (WRAP PREVENTION)
+				break;
+		}
+
+		column = &moviecolumns[col>>FRACBITS];
+
+		for (unsigned i = 0; i < column->num_posts; i++)
+		{
+			post_t *post = &column->posts[i];
+			source = column->pixels + post->data_offset;
+			dest = desttop;
+			if (scrn & V_FLIP)
+				dest = deststart + (destend - desttop);
+			dest += FixedInt(FixedMul(post->topdelta<<FRACBITS,vdup))*vid.width;
+
+			for (ofs = 0; dest < deststop && (size_t)(ofs>>FRACBITS) < post->length; ofs += rowfrac)
 			{
 				if (dest >= screens[scrn&V_PARAMMASK]) // don't draw off the top of the screen (CRASH PREVENTION)
 					*dest = patchdrawfunc(dest, source, ofs);

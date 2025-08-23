@@ -25,6 +25,8 @@
 #include "w_wad.h"
 #include "z_zone.h"
 #include "y_inter.h"
+#include "d_main.h"
+#include "movie_decode.h"
 
 #include "lua_script.h"
 #include "lua_libs.h"
@@ -482,7 +484,7 @@ static int libd_cachePatch(lua_State *L)
 		}
 	}
 #endif
-	
+
 	LUA_PushUserdata(L, patch, META_PATCH);
 	return 1;
 }
@@ -1097,6 +1099,38 @@ static int libd_drawLevelTitle(lua_State *L)
 	return 0;
 }
 
+#ifdef HAVE_LIBAV
+static int libd_drawMovie(lua_State *L)
+{
+	fixed_t x, y, scale;
+	INT32 flags;
+	huddrawlist_h list;
+
+	HUDONLY
+	x = luaL_checkinteger(L, 1);
+	y = luaL_checkinteger(L, 2);
+	scale = luaL_optinteger(L, 3, FRACUNIT);
+	if (scale < 0)
+		return luaL_error(L, "negative scale");
+	flags = luaL_optinteger(L, 4, 0);
+
+	flags &= ~V_PARAMMASK; // Don't let crashes happen.
+
+	lua_getfield(L, LUA_REGISTRYINDEX, "HUD_DRAW_LIST");
+	list = (huddrawlist_h) lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	if (!activemovie)
+		return 0;
+
+	if (LUA_HUD_IsDrawListValid(list))
+		LUA_HUD_AddDrawMovie(list, x, y, scale, activemovie, flags);
+	else
+		V_DrawMovie(x, y, scale, scale, flags, activemovie);
+	return 0;
+}
+#endif
+
 static int libd_stringWidth(lua_State *L)
 {
 	const char *str = luaL_checkstring(L, 1);
@@ -1386,6 +1420,9 @@ static luaL_Reg lib_draw[] = {
 	{"drawNameTag", libd_drawNameTag},
 	{"drawScaledNameTag", libd_drawScaledNameTag},
 	{"drawLevelTitle", libd_drawLevelTitle},
+#ifdef HAVE_LIBAV
+	{"drawMovie", libd_drawMovie},
+#endif
 	{"fadeScreen", libd_fadeScreen},
 	// misc
 	{"stringWidth", libd_stringWidth},

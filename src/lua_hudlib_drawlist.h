@@ -19,6 +19,7 @@
 
 #include "doomtype.h"
 #include "r_defs.h"
+#include "movie_decode.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,6 +135,14 @@ void LUA_HUD_AddDrawLevelTitle(
 	INT32 x,
 	INT32 y,
 	const char *str,
+	INT32 flags
+);
+void LUA_HUD_AddDrawMovie(
+	huddrawlist_h list,
+	fixed_t x,
+	fixed_t y,
+	fixed_t scale,
+	movie_t *movie,
 	INT32 flags
 );
 void LUA_HUD_AddFadeScreen(
