@@ -702,6 +702,8 @@ void R_CheckMovieTextureCache(movie_t *movie, INT32 texnum)
 	Patch_MakeColumns(swpatch, texture->width, texture->width, block, columns, posts, 0);
 
 	Z_Free(swpatch);
+
+	Z_ChangeTag(block, PU_CACHE);
 }
 
 column_t *R_GetColumn(fixed_t tex, INT32 col)
