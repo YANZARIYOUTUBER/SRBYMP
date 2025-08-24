@@ -1437,6 +1437,11 @@ boolean I_LoadSong(char *data, size_t len)
 	return false;
 }
 
+boolean I_LoadMovieSong(void)
+{
+	return false;
+}
+
 void I_UnloadSong(void) { }
 
 boolean I_PlaySong(boolean looping)
