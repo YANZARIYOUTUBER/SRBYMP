@@ -594,7 +594,7 @@ static boolean ReceiveFrame(moviedecodeworker_t *worker, moviedecodeworkerstream
 		I_Error("FFmpeg: cannot receive frame");
 }
 
-static INT8 dithermatrix[8][8] = {
+static SINT8 dithermatrix[8][8] = {
 	{ -31.5,   0.5, -23.5,   8.5, -27.5,   4.5, -19.5,  12.5 },
 	{  16.5, -15.5,  24.5,  -7.5,  20.5, -11.5,  28.5,  -3.5 },
 	{  -9.5,  22.5, -29.5,   2.5, -13.5,  18.5, -25.5,   6.5 },
