@@ -262,9 +262,17 @@ static void AllocateAVImage(moviedecodeworker_t *worker, avimage_t *image, enum 
 {
 	AVCodecContext *context = worker->videostream.codeccontext;
 
+	// IMPORTANT NOTE:
+	// context->height + 1 is a hack I had to resort to because libav,
+	// for some reason, writes slightly past the allocated buffer,
+	// probably as a result of SSE2/AVX-related optimisations.
+	// I suspect this is a bug specific to the 32-bit versions of libav.
+	// Not very elegant, but this was the simplest sane solution I could
+	// think of that has essentially no downsides beyond a ~1% memory waste.
+
 	image->datasize = av_image_alloc(
 		image->data, image->linesize,
-		context->width, context->height,
+		context->width, context->height + 1,
 		pixelformat, alignment
 	);
 	if (image->datasize < 0)
