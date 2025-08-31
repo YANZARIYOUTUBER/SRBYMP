@@ -35,6 +35,9 @@
 
 #define ZWAD
 
+#define YMPF_MAGIC "YMPF"
+#define YMPF_VERSION 0x01
+
 #ifdef ZWAD
 #include <errno.h>
 #include "lzf.h"
@@ -101,6 +104,29 @@ typedef struct lumpnum_cache_s
 	lumpnum_t lumpnum;
 	UINT32 hash;
 } lumpnum_cache_t;
+
+typedef struct
+{
+    char magic[4];      // "YMPF"
+    UINT8 version;      // version
+    UINT8 flags;        // flags (bit 0: mod C/C++)
+    UINT16 headerSize;  // size
+    UINT32 directoryOffset;
+    UINT32 directorySize;
+    UINT32 iconOffset;
+    UINT32 iconSize;
+    UINT8 reserved[48]; // reserved
+} ympf_header_t;
+
+typedef struct
+{
+    UINT32 offset;
+    UINT32 size;
+    UINT32 disksize;
+    UINT8 compression;
+    UINT8 flags;
+    UINT16 namelength;
+} ympf_lump_info_t;
 
 static lumpnum_cache_t lumpnumcache[LUMPNUMCACHESIZE];
 static UINT16 lumpnumcacheindex = 0;
@@ -243,6 +269,53 @@ static void W_LoadDehackedLumpsPK3(UINT16 wadnum, boolean mainfile)
 	}
 }
 
+static void W_LoadDehackedLumpsYMPF(UINT16 wadnum, boolean mainfile)
+{
+    UINT16 posStart, posEnd;
+
+    // Check Lua
+    posStart = W_CheckNumForFullNamePK3("script/", wadnum, 0);
+    if (posStart != INT16_MAX)
+    {
+        posEnd = W_CheckNumForFolderEndPK3("script/", wadnum, posStart);
+        for (; posStart < posEnd; posStart++)
+            LUA_DoLump(wadnum, posStart, true);
+    }
+
+    // Check Soc
+    posStart = W_CheckNumForFullNamePK3("soc/", wadnum, 0);
+    if (posStart != INT16_MAX)
+    {
+        posEnd = W_CheckNumForFolderEndPK3("soc/", wadnum, posStart);
+        for(; posStart < posEnd; posStart++)
+        {
+            lumpinfo_t *lump_p = &wadfiles[wadnum]->lumpinfo[posStart];
+            size_t length = strlen(wadfiles[wadnum]->filename) + 1 + strlen(lump_p->fullname);
+            char *name = malloc(length + 1);
+            sprintf(name, "%s|%s", wadfiles[wadnum]->filename, lump_p->fullname);
+            name[length] = '\0';
+            CONS_Printf(M_GetText("Loading SOC from %s\n"), name);
+            DEH_LoadDehackedLumpPwad(wadnum, posStart, mainfile);
+            free(name);
+        }
+    }
+
+    // mod c/c++
+    if (W_IsCppMod(wadnum)) // :(
+    {
+        posStart = W_CheckNumForFullNamePK3("source code/", wadnum, 0);
+        if (posStart != INT16_MAX)
+        {
+            posEnd = W_CheckNumForFolderEndPK3("source code/", wadnum, posStart);
+            for(; posStart < posEnd; posStart++)
+            {
+                // Process
+                ProcessCppSource(wadnum, posStart); // :(
+            }
+        }
+    }
+}
+
 // search for all DEHACKED lump in all wads and load it
 static void W_LoadDehackedLumps(UINT16 wadnum, boolean mainfile)
 {
@@ -349,6 +422,8 @@ static restype_t ResourceFileDetect (const char* filename)
 		return RET_SOC;
 	if (!stricmp(&filename[strlen(filename) - 4], ".lua"))
 		return RET_LUA;
+	if (!stricmp(&filename[strlen(filename) - 5], ".ympf"))
+        return RET_YMPF;
 
 	return RET_WAD;
 }
@@ -694,6 +769,104 @@ static lumpinfo_t* ResGetLumpsZip (FILE* handle, UINT16* nlmp)
 	return lumpinfo;
 }
 
+static lumpinfo_t* ResGetLumpsYmpf(FILE* handle, UINT16* nlmp, const char* filename)
+{
+    UINT16 numlumps = *nlmp;
+    lumpinfo_t* lumpinfo;
+    ympf_header_t header;
+    size_t i;
+    
+    // header
+    if (fread(&header, 1, sizeof(header), handle) < sizeof(header))
+    {
+        CONS_Alert(CONS_ERROR, "Can't read YMPF header: %s\n", M_FileError(handle));
+        return NULL;
+    }
+    
+    // check magic number
+    if (memcmp(header.magic, YMPF_MAGIC, 4) != 0)
+    {
+        CONS_Alert(CONS_ERROR, "Invalid YMPF header\n");
+        return NULL;
+    }
+    
+    // check version
+    if (header.version != YMPF_VERSION)
+    {
+        CONS_Alert(CONS_ERROR, "Unsupported YMPF version: %d\n", header.version);
+        return NULL;
+    }
+    
+    // go to dir
+    if (fseek(handle, header.directoryOffset, SEEK_SET) == -1)
+    {
+        CONS_Alert(CONS_ERROR, "Can't seek to YMPF directory: %s\n", M_FileError(handle));
+        return NULL;
+    }
+    
+    // read numlups
+    if (fread(&numlumps, 1, sizeof(numlumps), handle) < sizeof(numlumps))
+    {
+        CONS_Alert(CONS_ERROR, "Can't read YMPF lump count: %s\n", M_FileError(handle));
+        return NULL;
+    }
+    
+    numlumps = SHORT(numlumps);
+    *nlmp = numlumps;
+    
+    // !!!
+    lumpinfo = Z_Malloc(numlumps * sizeof(lumpinfo_t), PU_STATIC, NULL);
+    
+    // Read
+    for (i = 0; i < numlumps; i++)
+    {
+        ympf_lump_info_t ympfLump;
+        lumpinfo_t *lump_p = &lumpinfo[i];
+        
+        // info
+        if (fread(&ympfLump, 1, sizeof(ympfLump), handle) < sizeof(ympfLump))
+        {
+            CONS_Alert(CONS_ERROR, "Can't read YMPF lump info: %s\n", M_FileError(handle));
+            Z_Free(lumpinfo);
+            return NULL;
+        }
+        
+        // lumpinfo
+        lump_p->position = LONG(ympfLump.offset);
+        lump_p->size = LONG(ympfLump.size);
+        lump_p->disksize = LONG(ympfLump.disksize);
+        lump_p->compression = ympfLump.compression;
+        
+        // lump name
+        char* namebuf = malloc(ympfLump.namelength + 1);
+        if (fread(namebuf, 1, ympfLump.namelength, handle) < ympfLump.namelength)
+        {
+            CONS_Alert(CONS_ERROR, "Can't read YMPF lump name: %s\n", M_FileError(handle));
+            free(namebuf);
+            Z_Free(lumpinfo);
+            return NULL;
+        }
+        namebuf[ympfLump.namelength] = '\0';
+        
+        // Config name
+        strlcpy(lump_p->name, namebuf, sizeof(lump_p->name));
+        lump_p->namelength = strlen(lump_p->name);
+        lump_p->hash.name = W_HashLumpName(lump_p->name);
+        
+        lump_p->longname = Z_StrDup(namebuf);
+        lump_p->longnamelength = strlen(lump_p->longname);
+        lump_p->hash.longname = W_HashLumpName(lump_p->longname);
+        
+        lump_p->fullname = Z_StrDup(namebuf);
+        lump_p->fullnamelength = strlen(lump_p->fullname);
+        lump_p->hash.fullname = W_HashLumpName(lump_p->fullname);
+        
+        free(namebuf);
+    }
+    
+    return lumpinfo;
+}
+
 static INT32 CheckPathsNotEqual(const char *path1, const char *path2)
 {
 	INT32 stat = samepaths(path1, path2);
@@ -923,6 +1096,9 @@ UINT16 W_InitFile(const char *filename, boolean mainfile, boolean startup)
 
 	switch(type = ResourceFileDetect(filename))
 	{
+	case RET_YMPF:
+        lumpinfo = ResGetLumpsYmpf(handle, &numlumps, filename);
+        break;
 	case RET_SOC:
 		lumpinfo = ResGetLumpsStandalone(handle, &numlumps, "OBJCTCFG");
 		break;
