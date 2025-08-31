@@ -117,6 +117,7 @@ typedef enum restype
 	RET_SOC,
 	RET_LUA,
 	RET_PK3,
+	RET_YMPF,
 	RET_FOLDER,
 	RET_UNKNOWN,
 } restype_t;
