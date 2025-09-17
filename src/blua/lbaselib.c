@@ -54,6 +54,25 @@ static int luaB_print (lua_State *L) {
   return 0;
 }
 
+static int luaB_getthemodname (lua_State *L) {
+	lua_pushstring(L, wadfiles[numwadfiles].filename);
+	return 0;
+}
+
+static int luaB_getthemodpath (lua_State *L) {
+	lua_pushstring(L, wadfiles[numwadfiles].path);
+	return 0;
+}
+
+static int luaB_getthemodhandle (lua_State *L) {
+	FILE *fp = wadfiles[numwadfiles].handle;
+	
+	FILE **ud = (FILE **) lua_newuserdata(L, sizeof(FILE *));
+    *ud = fp;
+	luaL_getmetatable(L, LUA_FILEHANDLE);
+	lua_setmetatable(L, -2);
+	return 0;
+}
 
 static int luaB_tonumber (lua_State *L) {
   int base = luaL_optint(L, 2, 10);
@@ -443,6 +462,9 @@ static const luaL_Reg base_funcs[] = {
   {"type", luaB_type},
   {"unpack", luaB_unpack},
   {"xpcall", luaB_xpcall},
+{"GetTheModName",luaB_getthemodname},
+{"GetTheModPath",luaB_getthemodpath},
+{"GetTheModHandle",luaB_getthemodhandle},
   {NULL, NULL}
 };
 
