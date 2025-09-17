@@ -46,6 +46,9 @@ extern boolean ignoregameinputs;
 #define META_SKINSPRITESLIST "SKIN_T*SKINSPRITES[]"
 #define META_SKINSPRITESCOMPAT "SKIN_T*SPRITES" // TODO: 2.3: Delete
 
+#define META_SNAKE "SNAKE_T*"
+#define META_WAD "WADFILE_T*"
+
 #define META_VERTEX "VERTEX_T*"
 #define META_LINE "LINE_T*"
 #define META_SIDE "SIDE_T*"
