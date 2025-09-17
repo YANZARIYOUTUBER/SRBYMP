@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../snake.h"
 #include "../doomdef.h"
 #include "../lua_script.h"
 #include "../w_wad.h"
