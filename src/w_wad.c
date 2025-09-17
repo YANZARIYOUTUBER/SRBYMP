@@ -273,6 +273,12 @@ static void W_LoadDehackedLumpsYMPF(UINT16 wadnum, boolean mainfile)
 {
     UINT16 posStart, posEnd;
 
+	posStart = W_CheckNumForFullNamePK3("Init.lua", wadnum, 0);
+	if (posStart != INT16_MAX)
+	{
+		LUA_DoLump(wadnum, posStart, true);
+	}
+	
     // Check Lua
     posStart = W_CheckNumForFullNamePK3("script/", wadnum, 0);
     if (posStart != INT16_MAX)
@@ -299,6 +305,18 @@ static void W_LoadDehackedLumpsYMPF(UINT16 wadnum, boolean mainfile)
             free(name);
         }
     }
+
+	if (memcmp(lump_p->name,"Main_Configuration",strlen("Main_Configuration")+1)==0) // Check for MAINCFG
+	{
+		CONS_Printf(M_GetText("Loading main config from %s\n"), wadfiles[wadnum]->filename);
+		DEH_LoadDehackedLumpPwad(wadnum, lump, mainfile);
+	}
+
+	if (memcmp(lump_p->name,"Object_Configuration",strlen("Object_Configuration")+1)==0) // Check for OBJCTCFG
+	{
+		CONS_Printf(M_GetText("Loading object config from %s\n"), wadfiles[wadnum]->filename);
+		DEH_LoadDehackedLumpPwad(wadnum, lump, mainfile);
+	}
 
     // mod c/c++
     if (W_IsCppMod(wadnum)) // :(
